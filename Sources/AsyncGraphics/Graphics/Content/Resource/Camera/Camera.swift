@@ -16,6 +16,20 @@ extension Graphic {
         
         return self.camera(with: camera)
     }
+
+    /// Async live stream from the camera with preview-sized output buffers.
+    public static func camera(device: AVCaptureDevice,
+                              quality: AVCaptureSession.Preset = .high,
+                              previewSized: Bool) throws -> AsyncStream<Graphic> {
+
+        let camera = try Camera(
+            device: device,
+            quality: quality,
+            previewSized: previewSized
+        )
+
+        return self.camera(with: camera)
+    }
     
     /// Async live stream from the camera
     public static func camera(at position: CameraPosition = .front,
@@ -26,37 +40,49 @@ extension Graphic {
         
         return self.camera(with: camera)
     }
+
+    /// Async live stream from the camera with preview-sized output buffers.
+    public static func camera(at position: CameraPosition = .front,
+                              lens: AVCaptureDevice.DeviceType = .builtInWideAngleCamera,
+                              quality: AVCaptureSession.Preset = .high,
+                              previewSized: Bool) throws -> AsyncStream<Graphic> {
+
+        let camera = try Camera(
+            position.av,
+            with: lens,
+            quality: quality,
+            external: position == .external,
+            previewSized: previewSized
+        )
+
+        return self.camera(with: camera)
+    }
 #endif
     
     /// Async live stream from the camera
     public static func camera(with camera: Camera) -> AsyncStream<Graphic> {
         camera.start()
         return AsyncStream<Graphic> {
-            await withCheckedContinuation { continuation in
-                Task { @MainActor in
-                    camera.graphicsHandler = { graphic in
-                        camera.graphicsHandler = nil
-                        Task {
-                            var graphic: Graphic = graphic
-                            do {
-                                graphic = try await rotated(
-                                    graphic: graphic,
-                                    at: camera.position
-                                )
-                                graphic = try await mirrored(
-                                    graphic: graphic,
-                                    at: camera.position
-                                )
-                            } catch {
-                                print("AsyncGraphics - Failed to orient camera graphic: \(error)")
-                            }
-                            continuation.resume(returning: graphic)
-                        }
-                    }
-                }
+            guard !Task.isCancelled,
+                  var graphic = await camera.nextGraphic()
+            else { return nil }
+            do {
+                graphic = try await rotated(
+                    graphic: graphic,
+                    at: camera.position
+                )
+                guard !Task.isCancelled else { return nil }
+                graphic = try await mirrored(
+                    graphic: graphic,
+                    at: camera.position
+                )
+            } catch {
+                print("AsyncGraphics - Failed to orient camera graphic: \(error)")
             }
+            guard !Task.isCancelled else { return nil }
+            return graphic
         } onCancel: {
-            camera.stop()
+            camera.stopWithoutWaiting()
         }
     }
 }

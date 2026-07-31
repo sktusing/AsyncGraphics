@@ -22,9 +22,6 @@ final class GraphicMetalView: MTKView, GraphicMetalViewable {
     @MainActor
     let didRender: (UUID) -> ()
     
-    private var metalQueue: DispatchQueue?
-    private let metalQueueKey = DispatchSpecificKey<String>()
-    
     private var commandQueue: MTLCommandQueue?
     
     init(interpolation: Graphic.ViewInterpolation,
@@ -36,9 +33,6 @@ final class GraphicMetalView: MTKView, GraphicMetalViewable {
         self.didRender = didRender
         
         super.init(frame: .zero, device: Renderer.metalDevice)
-        
-        metalQueue = DispatchQueue(label: "GraphicMetalView")
-        metalQueue?.setSpecific(key: metalQueueKey, value: "GraphicMetalView")
         
         commandQueue = Renderer.metalDevice.makeCommandQueue()
         
@@ -120,8 +114,6 @@ extension GraphicMetalView: MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
     
     func draw(in view: MTKView) {
-        guard let metalQueue else { return }
-
         guard let graphic: Graphic = graphic else { return }
         let sourceTexture: MTLTexture = graphic.texture
         
@@ -160,18 +152,15 @@ extension GraphicMetalView: MTKViewDelegate {
             scaleKernel.encode(commandBuffer: commandBuffer, sourceTexture: sourceTexture, destinationTexture: destinationTexture)
         }
         
-        metalQueue.async {
-            
-            commandBuffer.addCompletedHandler { [weak self] _ in
-                let id: UUID = graphic.id
-                guard let self else { return }
-                Task { @MainActor in
-                    self.didRender(id)
-                }
+        commandBuffer.addCompletedHandler { [weak self] _ in
+            let id: UUID = graphic.id
+            guard let self else { return }
+            Task { @MainActor in
+                self.didRender(id)
             }
-            commandBuffer.present(drawable)
-            commandBuffer.commit()
         }
+        commandBuffer.present(drawable)
+        commandBuffer.commit()
     }
 }
 

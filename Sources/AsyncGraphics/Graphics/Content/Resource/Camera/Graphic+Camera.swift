@@ -4,6 +4,7 @@
 
 import Metal
 @preconcurrency import AVKit
+import os
 
 @available(*, deprecated, renamed: "Graphic.Camera")
 typealias CameraController = Graphic.Camera
@@ -11,6 +12,11 @@ typealias CameraController = Graphic.Camera
 extension Graphic {
     
     public final class Camera: NSObject, Sendable {
+
+        private struct FrameRequest: Sendable {
+            let id: UUID
+            let handler: @Sendable (Graphic?) -> Void
+        }
         
         enum CameraError: LocalizedError {
             
@@ -33,14 +39,20 @@ extension Graphic {
             }
         }
         
-        @MainActor
-        var graphicsHandler: ((Graphic) -> ())?
-        
         let position: AVCaptureDevice.Position
         private let device: AVCaptureDevice
         private let videoInput: AVCaptureDeviceInput
         private let videoOutput: AVCaptureVideoDataOutput
         private let captureSession: AVCaptureSession
+        private let previewSized: Bool
+        private let sessionQueue = DispatchQueue(
+            label: "async-graphics.camera.session",
+            qos: .userInitiated,
+            autoreleaseFrequency: .workItem
+        )
+        private let frameRequest = OSAllocatedUnfairLock<FrameRequest?>(
+            initialState: nil
+        )
         
         @MainActor
         public var subjectAreaChange: (() -> Void)?
@@ -66,6 +78,24 @@ extension Graphic {
                                 quality preset: AVCaptureSession.Preset = .high,
                                 external: Bool = false,
                                 centerStage: Bool = true) throws {
+            try self.init(
+                position,
+                with: deviceType,
+                quality: preset,
+                external: external,
+                centerStage: centerStage,
+                previewSized: false
+            )
+        }
+
+        /// Creates a camera that can deliver screen-sized preview buffers while retaining
+        /// the selected capture preset's framing and aspect ratio.
+        public convenience init(_ position: AVCaptureDevice.Position,
+                                with deviceType: AVCaptureDevice.DeviceType = .builtInWideAngleCamera,
+                                quality preset: AVCaptureSession.Preset = .high,
+                                external: Bool = false,
+                                centerStage: Bool = true,
+                                previewSized: Bool) throws {
             
             var device: AVCaptureDevice! = .default(deviceType,
                                                     for: .video,
@@ -88,17 +118,34 @@ extension Graphic {
             if device == nil {
                 throw CameraError.captureDeviceNotSupported
             }
-            try self.init(device: device, quality: preset)
+            try self.init(
+                device: device,
+                quality: preset,
+                previewSized: previewSized
+            )
             
             AVCaptureDevice.isCenterStageEnabled = centerStage
             isCenterStageEnabled = centerStage
         }
         
+        public convenience init(device: AVCaptureDevice,
+                                quality preset: AVCaptureSession.Preset = .high) throws {
+            try self.init(
+                device: device,
+                quality: preset,
+                previewSized: false
+            )
+        }
+
+        /// Creates a camera that can deliver screen-sized preview buffers while retaining
+        /// the selected capture preset's framing and aspect ratio.
         public init(device: AVCaptureDevice,
-                    quality preset: AVCaptureSession.Preset = .high) throws {
+                    quality preset: AVCaptureSession.Preset = .high,
+                    previewSized: Bool) throws {
             
             self.position = device.position
             self.device = device
+            self.previewSized = previewSized
             
             AVCaptureDevice.centerStageControlMode = .app
             
@@ -127,7 +174,11 @@ extension Graphic {
             videoOutput.videoSettings = [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
             ]
-            let queue = DispatchQueue(label: "async-graphics.camera")
+            let queue = DispatchQueue(
+                label: "async-graphics.camera.frames",
+                qos: .userInitiated,
+                autoreleaseFrequency: .workItem
+            )
             
             guard captureSession.canAddOutput(videoOutput) else {
                 throw CameraError.outputCanNotBeAdded
@@ -151,6 +202,7 @@ extension Graphic {
             
             self.position = device.position
             self.device = device
+            previewSized = false
             
             captureSession = AVCaptureSession()
             
@@ -164,7 +216,11 @@ extension Graphic {
             videoOutput.videoSettings = [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
             ]
-            let queue = DispatchQueue(label: "async-graphics.camera")
+            let queue = DispatchQueue(
+                label: "async-graphics.camera.frames",
+                qos: .userInitiated,
+                autoreleaseFrequency: .workItem
+            )
             
             guard captureSession.canAddOutput(videoOutput) else {
                 throw CameraError.outputCanNotBeAdded
@@ -185,7 +241,18 @@ extension Graphic {
         
         deinit {
             NotificationCenter.default.removeObserver(self)
-            stop()
+            cancelFrameRequest()
+
+            let captureSession = captureSession
+            let videoInput = videoInput
+            let videoOutput = videoOutput
+            sessionQueue.async {
+                Self.stop(
+                    captureSession: captureSession,
+                    videoInput: videoInput,
+                    videoOutput: videoOutput
+                )
+            }
         }
         
 #if !os(visionOS)
@@ -211,22 +278,139 @@ extension Graphic {
         /// Starts the capture session.
         /// Automatically called on when used with ``Graphic.camera(with:)``.
         public func start() {
-            if captureSession.isRunning { return }
-            captureSession.addInput(videoInput)
-            captureSession.addOutput(videoOutput)
-            Task {
-                captureSession.startRunning()
+            sessionQueue.async { [self] in
+                startCaptureSession()
+            }
+        }
+
+        /// Starts the capture session and returns after startup finishes.
+        ///
+        /// Use this when another capture session must not overlap this camera's startup.
+        public func startAndWait() async {
+            await withCheckedContinuation { continuation in
+                sessionQueue.async { [self] in
+                    startCaptureSession()
+                    continuation.resume()
+                }
             }
         }
         
         /// Stop Camera
         ///
         /// Stops the capture session.
+        /// In async or actor-isolated code, prefer ``stopAndWait()`` to avoid blocking.
         public func stop() {
-            guard captureSession.isRunning else { return }
-            captureSession.removeInput(videoInput)
-            captureSession.removeOutput(videoOutput)
-            captureSession.stopRunning()
+            cancelFrameRequest()
+            sessionQueue.sync { [self] in
+                stopCaptureSession()
+            }
+        }
+
+        func stopWithoutWaiting() {
+            cancelFrameRequest()
+            sessionQueue.async { [self] in
+                stopCaptureSession()
+            }
+        }
+
+        /// Stops the capture session and returns after the camera is released.
+        ///
+        /// Use this before handing the camera to another capture session or lens.
+        public func stopAndWait() async {
+            cancelFrameRequest()
+            await withCheckedContinuation { continuation in
+                sessionQueue.async { [self] in
+                    stopCaptureSession()
+                    continuation.resume()
+                }
+            }
+        }
+
+        func nextGraphic() async -> Graphic? {
+            let id = UUID()
+            return await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    let request = FrameRequest(id: id) { graphic in
+                        continuation.resume(returning: graphic)
+                    }
+                    let previousRequest = frameRequest.withLock { pendingRequest in
+                        let previousRequest = pendingRequest
+                        pendingRequest = request
+                        return previousRequest
+                    }
+                    previousRequest?.handler(nil)
+                    if Task.isCancelled {
+                        cancelFrameRequest(id: id)
+                    }
+                }
+            } onCancel: {
+                self.cancelFrameRequest(id: id)
+            }
+        }
+
+        private func startCaptureSession() {
+            guard !captureSession.isRunning else { return }
+
+            captureSession.beginConfiguration()
+            if !captureSession.inputs.contains(where: { $0 === videoInput }),
+               captureSession.canAddInput(videoInput) {
+                captureSession.addInput(videoInput)
+            }
+            if !captureSession.outputs.contains(where: { $0 === videoOutput }),
+               captureSession.canAddOutput(videoOutput) {
+                captureSession.addOutput(videoOutput)
+            }
+#if os(iOS) || os(tvOS)
+            if previewSized {
+                videoOutput.automaticallyConfiguresOutputBufferDimensions = false
+                videoOutput.deliversPreviewSizedOutputBuffers = true
+            }
+#endif
+            captureSession.commitConfiguration()
+
+            guard captureSession.inputs.contains(where: { $0 === videoInput }),
+                  captureSession.outputs.contains(where: { $0 === videoOutput })
+            else { return }
+            captureSession.startRunning()
+        }
+
+        private func stopCaptureSession() {
+            Self.stop(
+                captureSession: captureSession,
+                videoInput: videoInput,
+                videoOutput: videoOutput
+            )
+        }
+
+        private static func stop(
+            captureSession: AVCaptureSession,
+            videoInput: AVCaptureDeviceInput,
+            videoOutput: AVCaptureVideoDataOutput
+        ) {
+            if captureSession.isRunning {
+                captureSession.stopRunning()
+            }
+            guard captureSession.inputs.contains(where: { $0 === videoInput })
+                    || captureSession.outputs.contains(where: { $0 === videoOutput })
+            else { return }
+            captureSession.beginConfiguration()
+            if captureSession.outputs.contains(where: { $0 === videoOutput }) {
+                captureSession.removeOutput(videoOutput)
+            }
+            if captureSession.inputs.contains(where: { $0 === videoInput }) {
+                captureSession.removeInput(videoInput)
+            }
+            captureSession.commitConfiguration()
+        }
+
+        private func cancelFrameRequest(id: UUID? = nil) {
+            let handler = frameRequest.withLock { pendingRequest -> (@Sendable (Graphic?) -> Void)? in
+                guard id == nil || pendingRequest?.id == id else { return nil }
+                let handler = pendingRequest?.handler
+                pendingRequest = nil
+                return handler
+            }
+            handler?(nil)
         }
     }
 }
@@ -234,14 +418,17 @@ extension Graphic {
 extension Graphic.Camera: AVCaptureVideoDataOutputSampleBufferDelegate {
  
     public func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        
+        guard let request = frameRequest.withLock({ $0 }) else { return }
         guard let pixelBuffer: CVPixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer),
               let texture: MTLTexture = try? pixelBuffer.texture(),
               let graphic: Graphic = try? .texture(texture)
         else { return }
-    
-        Task { @MainActor in
-            graphicsHandler?(graphic)
+
+        let handler = frameRequest.withLock { pendingRequest -> (@Sendable (Graphic?) -> Void)? in
+            guard pendingRequest?.id == request.id else { return nil }
+            pendingRequest = nil
+            return request.handler
         }
+        handler?(graphic)
     }
 }

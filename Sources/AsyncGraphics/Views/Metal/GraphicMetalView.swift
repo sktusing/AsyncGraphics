@@ -126,6 +126,7 @@ extension GraphicMetalView: MTKViewDelegate {
         if !extendedDynamicRange,
            graphic.bits == ._8,
            destinationTexture.pixelFormat == .rgba8Unorm,
+           destinationTexture.pixelFormat == sourceTexture.pixelFormat,
            destinationTexture.width == sourceTexture.width,
            destinationTexture.height == sourceTexture.height,
            let blitEncoder = commandBuffer.makeBlitCommandEncoder() {

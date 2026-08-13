@@ -102,7 +102,7 @@ extension Graphic {
             graphics: [self],
             uniforms: RainbowBlurUniforms(
                 type: type.index,
-                count: UInt32(sampleCount),
+                count: UInt32(min(max(sampleCount, 1), 1_000)),
                 radius: Float(relativeRadius),
                 angle: angle.uniform,
                 light: Float(light),
@@ -112,4 +112,3 @@ extension Graphic {
         )
     }
 }
-

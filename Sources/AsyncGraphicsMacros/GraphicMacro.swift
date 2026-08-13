@@ -44,7 +44,7 @@ public struct GraphicMacro: MemberMacro, MemberAttributeMacro {
         
         let block: MemberBlockSyntax  = classDecl.memberBlock
         
-        var variables: [String] = []
+        var variables: [(name: String, isValue: Bool)] = []
         for member in block.members {
             guard let variable = member.decl.as(VariableDeclSyntax.self)?.bindings.first,
                   let id = variable.pattern.as(IdentifierPatternSyntax.self) else {
@@ -54,15 +54,17 @@ public struct GraphicMacro: MemberMacro, MemberAttributeMacro {
             if blackList.contains(name) {
                 continue
             }
-            variables.append(name)
+            let typeName: String? = variable.typeAnnotation?.type
+                .as(IdentifierTypeSyntax.self)?.name.text
+            variables.append((name: name, isValue: typeName == "GraphicMetadata"))
         }
         
         let erasedVariables: [String] = variables.map { variable in
-            "_\(variable).erase()"
+            "\(variable.isValue ? "try " : "")_\(variable.name).erase()"
         }
         
         let enumVariables: [String] = variables.map { variable in
-            "case \(variable)"
+            "case \(variable.name)"
         }
         
         func camel(_ name: String) -> String {
@@ -77,9 +79,11 @@ public struct GraphicMacro: MemberMacro, MemberAttributeMacro {
             """),
             DeclSyntax(stringLiteral: """
             public var properties: [any AnyGraphicProperty] {
-                [
-                    \(erasedVariables.joined(separator: ",\n"))
-                ]
+                get throws {
+                    [
+                        \(erasedVariables.joined(separator: ",\n"))
+                    ]
+                }
             }
             """),
             DeclSyntax(stringLiteral: """

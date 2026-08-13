@@ -27,7 +27,7 @@ public class AnyGraphicValueProperty: AnyGraphicProperty {
                           minimumValue: GraphicMetadataValue<T>,
                           maximumValue: GraphicMetadataValue<T>,
                           options: GraphicMetadataOptions,
-                          update: @escaping (GraphicMetadataValue<T>) -> ()) {
+                          update: @escaping (GraphicMetadataValue<T>) -> ()) throws {
         
         self.type = type
         
@@ -35,10 +35,10 @@ public class AnyGraphicValueProperty: AnyGraphicProperty {
         self.name = name
         self.docs = docs
         
-        self.value = Self.encode(value)
-        self.defaultValue = Self.encode(defaultValue)
-        self.minimumValue = Self.encode(minimumValue)
-        self.maximumValue = Self.encode(maximumValue)
+        self.value = try Self.encode(value)
+        self.defaultValue = try Self.encode(defaultValue)
+        self.minimumValue = try Self.encode(minimumValue)
+        self.maximumValue = try Self.encode(maximumValue)
         
         self.options = options
         
@@ -67,7 +67,8 @@ public extension AnyGraphicValueProperty {
     }
     
     func setValue<T: GraphicValue>(_ value: GraphicMetadataValue<T>) throws {
-        try updateValue(Self.encode(value))
+        let encodedValue: String = try Self.encode(value)
+        try updateValue(encodedValue)
     }
     
     func setEncodedValue(_ encodedValue: String) throws {
@@ -77,14 +78,10 @@ public extension AnyGraphicValueProperty {
 
 extension AnyGraphicValueProperty {
     
-    static func encode<T: GraphicValue>(_ value: GraphicMetadataValue<T>) -> String {
-        do {
-            let encoder = JSONEncoder()
-            let data = try encoder.encode(value)
-            return String(data: data, encoding: .utf8)!
-        } catch {
-            fatalError("CodableGraphics - Encode in Property Failed: \(error)")
-        }
+    static func encode<T: GraphicValue>(_ value: GraphicMetadataValue<T>) throws -> String {
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(value)
+        return String(decoding: data, as: UTF8.self)
     }
     
     static func decode<T: GraphicValue>(_ string: String) throws -> GraphicMetadataValue<T> {

@@ -78,10 +78,34 @@ final class CodableGraphicsTests: XCTestCase {
         XCTAssert(noise.isVisible(property: scaleProperty, at: resolution) == false)
 
         let instance = noise.type.instance()
-        if let valueProperty = instance.properties.first(where: { $0.key == isRandomProperty.rawValue }) as? AnyGraphicValueProperty {
+        let properties: [any AnyGraphicProperty] = try instance.properties
+        if let valueProperty = properties.first(where: { $0.key == isRandomProperty.rawValue }) as? AnyGraphicValueProperty {
             try valueProperty.setValue(.fixed(true))
         }
         XCTAssert(instance.isVisible(propertyKey: scaleProperty.rawValue, at: resolution) == false)
+    }
+
+    func testSetValuePropagatesEncodingFailure() throws {
+        let noise = CodableGraphic.Content.Solid.Noise()
+        let properties: [any AnyGraphicProperty] = try noise.properties
+        let scaleProperty: AnyGraphicValueProperty = try XCTUnwrap(
+            properties.first(where: {
+                $0.key == CodableGraphic.Content.Solid.Noise.Property.scale.rawValue
+            }) as? AnyGraphicValueProperty
+        )
+
+        XCTAssertThrowsError(
+            try scaleProperty.setValue(GraphicMetadataValue<CGFloat>.fixed(.nan))
+        ) { error in
+            guard let encodingError = error as? EncodingError else {
+                XCTFail("Expected EncodingError, received \(error).")
+                return
+            }
+            guard case .invalidValue = encodingError else {
+                XCTFail("Expected EncodingError.invalidValue, received \(encodingError).")
+                return
+            }
+        }
     }
     
     func testVariants() throws {
@@ -92,7 +116,8 @@ final class CodableGraphicsTests: XCTestCase {
         let arcs = CodableGraphic.Content.Shape.Arc.variants()
         for arc in arcs {
             let variant = variants.first(where: { $0.description == arc.description })!
-            let length: Angle = try (arc.instance.properties.first(where: {
+            let properties: [any AnyGraphicProperty] = try arc.instance.properties
+            let length: Angle = try (properties.first(where: {
                 $0.key == lengthProperty.rawValue
             }) as! AnyGraphicValueProperty).getValue().eval(at: resolution)
             switch variant {

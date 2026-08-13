@@ -7,7 +7,7 @@ public protocol CodableGraphicProtocol {
     var docs: String { get }
     var tags: [String] { get }
     
-    var properties: [any AnyGraphicProperty] { get }
+    var properties: [any AnyGraphicProperty] { get throws }
     
     init()
     

@@ -25,8 +25,8 @@ public class GraphicValueProperty<T: GraphicValue> {
 
 extension GraphicValueProperty {
 
-    public func erase() -> AnyGraphicValueProperty {
-        AnyGraphicValueProperty(
+    public func erase() throws -> AnyGraphicValueProperty {
+        try AnyGraphicValueProperty(
             type: type,
             key: key,
             name: name,

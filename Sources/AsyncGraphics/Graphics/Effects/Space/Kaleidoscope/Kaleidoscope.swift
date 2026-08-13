@@ -34,7 +34,7 @@ extension Graphic {
             graphics: [self],
             uniforms: KaleidoscopeUniforms(
                 mirror: mirror,
-                divisions: UInt32(count),
+                divisions: UInt32(min(max(count, 1), Int(UInt32.max))),
                 rotation: rotation.uniform,
                 scale: Float(scale),
                 position: relativePosition.uniform

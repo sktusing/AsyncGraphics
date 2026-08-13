@@ -118,7 +118,7 @@ extension Graphic {
             uniforms: BlurUniforms(
                 type: BlurType.box.index,
                 radius: Float(relativeRadius),
-                count: UInt32(sampleCount),
+                count: UInt32(min(max(sampleCount, 1), Int(UInt32.max))),
                 angle: 0.0,
                 position: CGPoint.zero.uniform
             ),
@@ -145,7 +145,7 @@ extension Graphic {
             uniforms: BlurUniforms(
                 type: BlurType.zoom.index,
                 radius: Float(relativeRadius),
-                count: UInt32(sampleCount),
+                count: UInt32(min(max(sampleCount, 1), Int(UInt32.max))),
                 angle: 0.0,
                 position: relativePosition.uniform
             ),
@@ -169,7 +169,7 @@ extension Graphic {
             uniforms: BlurUniforms(
                 type: BlurType.angle.index,
                 radius: Float(relativeRadius),
-                count: UInt32(sampleCount),
+                count: UInt32(min(max(sampleCount, 1), Int(UInt32.max))),
                 angle: angle.uniform,
                 position: CGPoint.zero.uniform
             ),

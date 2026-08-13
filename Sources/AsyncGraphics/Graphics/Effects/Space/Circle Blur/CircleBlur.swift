@@ -37,7 +37,7 @@ extension Graphic {
             shader: .name("circleBlur"),
             graphics: [self],
             uniforms: CircleBlurUniforms(
-                count: UInt32(sampleCount),
+                count: UInt32(min(max(sampleCount, 1), Int(UInt32.max))),
                 radius: Float(relativeRadius),
                 brightnessLow: Float(brightnessRange.lowerBound),
                 brightnessHigh: Float(brightnessRange.upperBound),

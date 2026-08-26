@@ -57,10 +57,22 @@ extension Graphic {
         let width = Int(resolution.width)
         let height = Int(resolution.height)
         let subPixelOffset: CGPoint = location - CGPoint(x: x, y: y)
-        let topLeftPixelColor: PixelColor = try await pixel(x: x, y: y)
-        let topRightPixelColor: PixelColor = x + 1 < width ? try await pixel(x: x + 1, y: y) : topLeftPixelColor
-        let bottomLeftPixelColor: PixelColor = y + 1 < height ? try await pixel(x: x, y: y + 1) : topLeftPixelColor
-        let bottomRightPixelColor: PixelColor = x + 1 < width && y + 1 < height ? try await pixel(x: x + 1, y: y + 1) : topLeftPixelColor
+        let topLeftPixelColor: PixelColor = try await pixel(
+            x: x,
+            y: y
+        )
+        let topRightPixelColor: PixelColor = try await pixel(
+            x: min(x + 1, width - 1),
+            y: y
+        )
+        let bottomLeftPixelColor: PixelColor = try await pixel(
+            x: x,
+            y: min(y + 1, height - 1)
+        )
+        let bottomRightPixelColor: PixelColor = try await pixel(
+            x: min(x + 1, width - 1),
+            y: min(y + 1, height - 1)
+        )
         let topPixelColor: PixelColor = topLeftPixelColor * (1.0 - subPixelOffset.x) + topRightPixelColor * subPixelOffset.x
         let bottomPixelColor: PixelColor = bottomLeftPixelColor * (1.0 - subPixelOffset.x) + bottomRightPixelColor * subPixelOffset.x
         return topPixelColor * (1.0 - subPixelOffset.y) + bottomPixelColor * subPixelOffset.y

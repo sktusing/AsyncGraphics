@@ -3,7 +3,115 @@
 //
 
 import Foundation
+import Spatial
+import SpatialExtensions
 import TextureMap
+import PixelColor
+
+extension Graphic3D {
+    
+    enum SubVoxelError: LocalizedError {
+        case voxelLocationOutOfBounds
+        var errorDescription: String? {
+            switch self {
+            case .voxelLocationOutOfBounds:
+                "Sub voxel location is out of bounds."
+            }
+        }
+    }
+    
+        /// Sample at a `location` coordinate, if the coordinate is fractional nearest voxels will be interpolated.
+        ///
+        /// Origin is at far top left.
+    public func subVoxel(at location: Point3D) async throws -> PixelColor {
+        try await subVoxel(x: location.x, y: location.y, z: location.z)
+    }
+    
+        /// Sample at an `x`, `y` and `z` coordinate, if the coordinate is fractional nearest voxels will be interpolated.
+        ///
+        /// Origin is at far top left.
+    public func subVoxel(x: CGFloat, y: CGFloat, z: CGFloat) async throws -> PixelColor {
+        try await subVoxel(u: x / (resolution.width - 1.0),
+                           v: y / (resolution.height - 1.0),
+                           w: z / (resolution.depth - 1.0))
+    }
+    
+        /// Sample at relative `uvw` coordinates
+        ///
+        /// `u` is horizontal, `v` is vertical, `w` is depth, between `0.0` and `1.0`.
+        ///
+        /// Origin is at top left.
+    public func subVoxel(u: CGFloat, v: CGFloat, w: CGFloat) async throws -> PixelColor {
+        guard u >= 0.0, u <= 1.0, v >= 0.0, v <= 1.0, w >= 0.0, w <= 1.0 else {
+            throw SubVoxelError.voxelLocationOutOfBounds
+        }
+        let uvw = Point3D(x: u, y: v, z: w)
+        let location: Point3D = uvw * (resolution - 1.0) + 0.5
+        let x = Int(location.x)
+        let y = Int(location.y)
+        let z = Int(location.z)
+        if CGFloat(x) == location.x - 0.5,
+           CGFloat(y) == location.y - 0.5,
+           CGFloat(z) == location.z - 0.5 {
+            return try await voxel(x: x, y: y, z: z)
+        }
+        let width = Int(resolution.width)
+        let height = Int(resolution.height)
+        let depth = Int(resolution.depth)
+        let subVoxelOffset: Point3D = location - Point3D(
+            x: CGFloat(x),
+            y: CGFloat(y),
+            z: CGFloat(z)
+        )
+        let farTopLeftVoxelColor: PixelColor = try await voxel(
+            x: x,
+            y: y,
+            z: z
+        )
+        let farTopRightVoxelColor: PixelColor = try await voxel(
+            x: min(x + 1, width - 1),
+            y: y,
+            z: z
+        )
+        let farBottomLeftVoxelColor: PixelColor = try await voxel(
+            x: x,
+            y: min(y + 1, height - 1),
+            z: z
+        )
+        let farBottomRightVoxelColor: PixelColor = try await voxel(
+            x: min(x + 1, width - 1),
+            y: min(y + 1, height - 1),
+            z: z
+        )
+        let farTopVoxelColor: PixelColor = farTopLeftVoxelColor * (1.0 - subVoxelOffset.x) + farTopRightVoxelColor * subVoxelOffset.x
+        let farBottomVoxelColor: PixelColor = farBottomLeftVoxelColor * (1.0 - subVoxelOffset.x) + farBottomRightVoxelColor * subVoxelOffset.x
+        let farVoxelColor: PixelColor = farTopVoxelColor * (1.0 - subVoxelOffset.y) + farBottomVoxelColor * subVoxelOffset.y
+        let nearTopLeftVoxelColor: PixelColor = try await voxel(
+            x: x,
+            y: y,
+            z: min(z + 1, depth - 1)
+        )
+        let nearTopRightVoxelColor: PixelColor = try await voxel(
+            x: min(x + 1, width - 1),
+            y: y,
+            z: min(z + 1, depth - 1)
+        )
+        let nearBottomLeftVoxelColor: PixelColor = try await voxel(
+            x: x,
+            y: min(y + 1, height - 1),
+            z: min(z + 1, depth - 1)
+        )
+        let nearBottomRightVoxelColor: PixelColor = try await voxel(
+            x: min(x + 1, width - 1),
+            y: min(y + 1, height - 1),
+            z: min(z + 1, depth - 1)
+        )
+        let nearTopVoxelColor: PixelColor = nearTopLeftVoxelColor * (1.0 - subVoxelOffset.x) + nearTopRightVoxelColor * subVoxelOffset.x
+        let nearBottomVoxelColor: PixelColor = nearBottomLeftVoxelColor * (1.0 - subVoxelOffset.x) + nearBottomRightVoxelColor * subVoxelOffset.x
+        let nearVoxelColor: PixelColor = nearTopVoxelColor * (1.0 - subVoxelOffset.y) + nearBottomVoxelColor * subVoxelOffset.y
+        return farVoxelColor * (1.0 - subVoxelOffset.z) + nearVoxelColor * subVoxelOffset.z
+    }
+}
 
 extension Graphic3D {
     

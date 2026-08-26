@@ -47,11 +47,11 @@ extension Graphic {
             throw SubPixelError.pixelLocationOutOfBounds
         }
         let uv = CGPoint(x: u, y: v)
-        let location: CGPoint = uv * (resolution - 1.0) + 0.5
+        let location: CGPoint = uv * (resolution - 1.0)
         let x = Int(location.x)
         let y = Int(location.y)
-        if CGFloat(x) == location.x - 0.5,
-           CGFloat(y) == location.y - 0.5 {
+        if CGFloat(x) == location.x,
+           CGFloat(y) == location.y {
             return try await pixel(x: x, y: y)
         }
         let width = Int(resolution.width)

@@ -46,13 +46,13 @@ extension Graphic3D {
             throw SubVoxelError.voxelLocationOutOfBounds
         }
         let uvw = Point3D(x: u, y: v, z: w)
-        let location: Point3D = uvw * (resolution - 1.0) + 0.5
+        let location: Point3D = uvw * (resolution - 1.0)
         let x = Int(location.x)
         let y = Int(location.y)
         let z = Int(location.z)
-        if CGFloat(x) == location.x - 0.5,
-           CGFloat(y) == location.y - 0.5,
-           CGFloat(z) == location.z - 0.5 {
+        if CGFloat(x) == location.x,
+           CGFloat(y) == location.y,
+           CGFloat(z) == location.z {
             return try await voxel(x: x, y: y, z: z)
         }
         let width = Int(resolution.width)

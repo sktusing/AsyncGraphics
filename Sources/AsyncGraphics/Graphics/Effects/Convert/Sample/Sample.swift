@@ -12,6 +12,10 @@ import PixelColor
 
 extension Graphic {
     
+    private struct SampleUniforms: Uniforms {
+        let location: PointUniform
+    }
+
     enum SubPixelError: LocalizedError {
         case pixelLocationOutOfBounds
         var errorDescription: String? {
@@ -48,33 +52,20 @@ extension Graphic {
         }
         let uv = CGPoint(x: u, y: v)
         let location: CGPoint = uv * (resolution - 1.0)
-        let x = Int(location.x)
-        let y = Int(location.y)
-        if CGFloat(x) == location.x,
-           CGFloat(y) == location.y {
-            return try await pixel(x: x, y: y)
-        }
-        let width = Int(resolution.width)
-        let height = Int(resolution.height)
-        let subPixelOffset: CGPoint = location - CGPoint(x: x, y: y)
-        let topLeftPixelColor: PixelColor = try await pixel(
-            x: x,
-            y: y
+        let graphic: Graphic = try await Renderer.render(
+            name: "Sample",
+            shader: .name("samplePixel"),
+            graphics: [self],
+            uniforms: SampleUniforms(
+                location: location.uniform
+            ),
+            metadata: Renderer.Metadata(
+                resolution: CGSize(width: 1, height: 1),
+                colorSpace: colorSpace,
+                bits: ._32
+            ),
+            options: EffectOptions.edgeStretch.spatialRenderOptions
         )
-        let topRightPixelColor: PixelColor = try await pixel(
-            x: min(x + 1, width - 1),
-            y: y
-        )
-        let bottomLeftPixelColor: PixelColor = try await pixel(
-            x: x,
-            y: min(y + 1, height - 1)
-        )
-        let bottomRightPixelColor: PixelColor = try await pixel(
-            x: min(x + 1, width - 1),
-            y: min(y + 1, height - 1)
-        )
-        let topPixelColor: PixelColor = topLeftPixelColor * (1.0 - subPixelOffset.x) + topRightPixelColor * subPixelOffset.x
-        let bottomPixelColor: PixelColor = bottomLeftPixelColor * (1.0 - subPixelOffset.x) + bottomRightPixelColor * subPixelOffset.x
-        return topPixelColor * (1.0 - subPixelOffset.y) + bottomPixelColor * subPixelOffset.y
+        return try await graphic.firstPixelColor
     }
 }

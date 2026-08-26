@@ -10,6 +10,10 @@ import PixelColor
 
 extension Graphic3D {
     
+    private struct Sample3DUniforms: Uniforms {
+        let location: VectorUniform
+    }
+
     enum SubVoxelError: LocalizedError {
         case voxelLocationOutOfBounds
         var errorDescription: String? {
@@ -47,69 +51,21 @@ extension Graphic3D {
         }
         let uvw = Point3D(x: u, y: v, z: w)
         let location: Point3D = uvw * (resolution - 1.0)
-        let x = Int(location.x)
-        let y = Int(location.y)
-        let z = Int(location.z)
-        if CGFloat(x) == location.x,
-           CGFloat(y) == location.y,
-           CGFloat(z) == location.z {
-            return try await voxel(x: x, y: y, z: z)
-        }
-        let width = Int(resolution.width)
-        let height = Int(resolution.height)
-        let depth = Int(resolution.depth)
-        let subVoxelOffset: Point3D = location - Point3D(
-            x: CGFloat(x),
-            y: CGFloat(y),
-            z: CGFloat(z)
+        let graphic: Graphic3D = try await Renderer.render(
+            name: "Sample 3D",
+            shader: .name("sampleVoxel"),
+            graphics: [self],
+            uniforms: Sample3DUniforms(
+                location: location.uniform
+            ),
+            metadata: Renderer.Metadata(
+                resolution: Size3D(width: 1, height: 1, depth: 1),
+                colorSpace: colorSpace,
+                bits: ._32
+            ),
+            options: EffectOptions.edgeStretch.spatialRenderOptions
         )
-        let farTopLeftVoxelColor: PixelColor = try await voxel(
-            x: x,
-            y: y,
-            z: z
-        )
-        let farTopRightVoxelColor: PixelColor = try await voxel(
-            x: min(x + 1, width - 1),
-            y: y,
-            z: z
-        )
-        let farBottomLeftVoxelColor: PixelColor = try await voxel(
-            x: x,
-            y: min(y + 1, height - 1),
-            z: z
-        )
-        let farBottomRightVoxelColor: PixelColor = try await voxel(
-            x: min(x + 1, width - 1),
-            y: min(y + 1, height - 1),
-            z: z
-        )
-        let farTopVoxelColor: PixelColor = farTopLeftVoxelColor * (1.0 - subVoxelOffset.x) + farTopRightVoxelColor * subVoxelOffset.x
-        let farBottomVoxelColor: PixelColor = farBottomLeftVoxelColor * (1.0 - subVoxelOffset.x) + farBottomRightVoxelColor * subVoxelOffset.x
-        let farVoxelColor: PixelColor = farTopVoxelColor * (1.0 - subVoxelOffset.y) + farBottomVoxelColor * subVoxelOffset.y
-        let nearTopLeftVoxelColor: PixelColor = try await voxel(
-            x: x,
-            y: y,
-            z: min(z + 1, depth - 1)
-        )
-        let nearTopRightVoxelColor: PixelColor = try await voxel(
-            x: min(x + 1, width - 1),
-            y: y,
-            z: min(z + 1, depth - 1)
-        )
-        let nearBottomLeftVoxelColor: PixelColor = try await voxel(
-            x: x,
-            y: min(y + 1, height - 1),
-            z: min(z + 1, depth - 1)
-        )
-        let nearBottomRightVoxelColor: PixelColor = try await voxel(
-            x: min(x + 1, width - 1),
-            y: min(y + 1, height - 1),
-            z: min(z + 1, depth - 1)
-        )
-        let nearTopVoxelColor: PixelColor = nearTopLeftVoxelColor * (1.0 - subVoxelOffset.x) + nearTopRightVoxelColor * subVoxelOffset.x
-        let nearBottomVoxelColor: PixelColor = nearBottomLeftVoxelColor * (1.0 - subVoxelOffset.x) + nearBottomRightVoxelColor * subVoxelOffset.x
-        let nearVoxelColor: PixelColor = nearTopVoxelColor * (1.0 - subVoxelOffset.y) + nearBottomVoxelColor * subVoxelOffset.y
-        return farVoxelColor * (1.0 - subVoxelOffset.z) + nearVoxelColor * subVoxelOffset.z
+        return try await graphic.firstVoxelColor
     }
 }
 
@@ -168,7 +124,7 @@ extension Graphic3D {
         }
     }
     
-    public func samples(/*axis: Axis = .z*/progress: (@Sendable (SampleProgress) async -> ())? = nil) async throws -> [Graphic] {
+    public func samples(progress: (@Sendable (SampleProgress) async -> ())? = nil) async throws -> [Graphic] {
         
         let axis: Axis = .z
         

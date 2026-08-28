@@ -291,7 +291,7 @@ struct ContentView: View {
                 let circleGraphic: Graphic = try await .circle(radius: 500,
                                                                backgroundColor: .clear,
                                                                resolution: resolution)
-                for await cameraGraphic in try Graphic.camera(.front) {
+                for await cameraGraphic in try await Graphic.camera(at: .front) {
                     graphic = try await circleGraphic
                         .blended(with: cameraGraphic,
                                  blendingMode: .multiply,

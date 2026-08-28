@@ -54,7 +54,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             do {
-                for await cameraGraphic in try Graphic.camera(.front) {
+                for await cameraGraphic in try await Graphic.camera(at: .front) {
                     graphic = cameraGraphic
                 }
             } catch {

@@ -10,17 +10,17 @@ extension Graphic {
 #if !os(visionOS)
     /// Async live stream from the camera
     public static func camera(device: AVCaptureDevice,
-                              quality: AVCaptureSession.Preset = .high) throws -> AsyncStream<Graphic> {
+                              quality: AVCaptureSession.Preset = .high) async throws -> AsyncStream<Graphic> {
         
         let camera = try Camera(device: device, quality: quality)
         
-        return self.camera(with: camera)
+        return try await self.camera(with: camera)
     }
 
     /// Async live stream from the camera with preview-sized output buffers.
     public static func camera(device: AVCaptureDevice,
                               quality: AVCaptureSession.Preset = .high,
-                              previewSized: Bool) throws -> AsyncStream<Graphic> {
+                              previewSized: Bool) async throws -> AsyncStream<Graphic> {
 
         let camera = try Camera(
             device: device,
@@ -28,24 +28,24 @@ extension Graphic {
             previewSized: previewSized
         )
 
-        return self.camera(with: camera)
+        return try await self.camera(with: camera)
     }
     
     /// Async live stream from the camera
     public static func camera(at position: CameraPosition = .front,
                               lens: AVCaptureDevice.DeviceType = .builtInWideAngleCamera,
-                              quality: AVCaptureSession.Preset = .high) throws -> AsyncStream<Graphic> {
+                              quality: AVCaptureSession.Preset = .high) async throws -> AsyncStream<Graphic> {
         
         let camera = try Camera(position.av, with: lens, quality: quality, external: position == .external)
         
-        return self.camera(with: camera)
+        return try await self.camera(with: camera)
     }
 
     /// Async live stream from the camera with preview-sized output buffers.
     public static func camera(at position: CameraPosition = .front,
                               lens: AVCaptureDevice.DeviceType = .builtInWideAngleCamera,
                               quality: AVCaptureSession.Preset = .high,
-                              previewSized: Bool) throws -> AsyncStream<Graphic> {
+                              previewSized: Bool) async throws -> AsyncStream<Graphic> {
 
         let camera = try Camera(
             position.av,
@@ -55,13 +55,13 @@ extension Graphic {
             previewSized: previewSized
         )
 
-        return self.camera(with: camera)
+        return try await self.camera(with: camera)
     }
 #endif
     
     /// Async live stream from the camera
-    public static func camera(with camera: Camera) -> AsyncStream<Graphic> {
-        camera.start()
+    public static func camera(with camera: Camera) async throws(Camera.CameraError) -> AsyncStream<Graphic> {
+        try await camera.start()
         return AsyncStream<Graphic> {
             guard !Task.isCancelled,
                   var graphic = await camera.nextGraphic()

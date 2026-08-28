@@ -18,14 +18,14 @@ extension Graphic {
             let handler: @Sendable (Graphic?) -> Void
         }
         
-        enum CameraError: LocalizedError {
+        public enum CameraError: LocalizedError, Sendable {
             
             case captureDeviceNotSupported
             case inputCanNotBeAdded
             case outputCanNotBeAdded
             case sessionPresetCanNotBeSet
             
-            var errorDescription: String? {
+            public var errorDescription: String? {
                 switch self {
                 case .captureDeviceNotSupported:
                     return "AsyncGraphics - Camera - Capture Device Not Supported"
@@ -34,7 +34,7 @@ extension Graphic {
                 case .outputCanNotBeAdded:
                     return "AsyncGraphics - Camera - Output Can Not be Added"
                 case .sessionPresetCanNotBeSet:
-                    return "AsyncGraphics - Camera - Session Preset Can Not be Added"
+                    return "AsyncGraphics - Camera - Session Preset Can Not be Set"
                 }
             }
         }
@@ -44,6 +44,9 @@ extension Graphic {
         private let videoInput: AVCaptureDeviceInput
         private let videoOutput: AVCaptureVideoDataOutput
         private let captureSession: AVCaptureSession
+#if !os(visionOS)
+        private let preset: AVCaptureSession.Preset
+#endif
         private let previewSized: Bool
         private let sessionQueue = DispatchQueue(
             label: "async-graphics.camera.session",
@@ -145,6 +148,7 @@ extension Graphic {
             
             self.position = device.position
             self.device = device
+            self.preset = preset
             self.previewSized = previewSized
             
             AVCaptureDevice.centerStageControlMode = .app
@@ -158,34 +162,19 @@ extension Graphic {
 #endif
             
             captureSession = AVCaptureSession()
-            
-            guard captureSession.canSetSessionPreset(preset) else {
-                throw CameraError.sessionPresetCanNotBeSet
-            }
-            captureSession.sessionPreset = preset
-            
+
             videoInput = try AVCaptureDeviceInput(device: device)
-            guard captureSession.canAddInput(videoInput) else {
-                throw CameraError.inputCanNotBeAdded
-            }
-            
+
             videoOutput = AVCaptureVideoDataOutput()
             videoOutput.alwaysDiscardsLateVideoFrames = true
-            videoOutput.videoSettings = [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
-            ]
             let queue = DispatchQueue(
                 label: "async-graphics.camera.frames",
                 qos: .userInitiated,
                 autoreleaseFrequency: .workItem
             )
             
-            guard captureSession.canAddOutput(videoOutput) else {
-                throw CameraError.outputCanNotBeAdded
-            }
-            
             super.init()
-            
+
             videoOutput.setSampleBufferDelegate(self, queue: queue)
             
 #if os(iOS)
@@ -205,29 +194,19 @@ extension Graphic {
             previewSized = false
             
             captureSession = AVCaptureSession()
-            
+
             videoInput = try AVCaptureDeviceInput(device: device)
-            guard captureSession.canAddInput(videoInput) else {
-                throw CameraError.inputCanNotBeAdded
-            }
-            
+
             videoOutput = AVCaptureVideoDataOutput()
             videoOutput.alwaysDiscardsLateVideoFrames = true
-            videoOutput.videoSettings = [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
-            ]
             let queue = DispatchQueue(
                 label: "async-graphics.camera.frames",
                 qos: .userInitiated,
                 autoreleaseFrequency: .workItem
             )
             
-            guard captureSession.canAddOutput(videoOutput) else {
-                throw CameraError.outputCanNotBeAdded
-            }
-            
             super.init()
-            
+
             videoOutput.setSampleBufferDelegate(self, queue: queue)
         }
 #endif
@@ -275,23 +254,24 @@ extension Graphic {
 
         /// Start Camera
         ///
-        /// Starts the capture session.
-        /// Automatically called on when used with ``Graphic.camera(with:)``.
-        public func start() {
-            sessionQueue.async { [self] in
-                startCaptureSession()
-            }
-        }
-
         /// Starts the capture session and returns after startup finishes.
-        ///
-        /// Use this when another capture session must not overlap this camera's startup.
-        public func startAndWait() async {
-            await withCheckedContinuation { continuation in
+        /// Automatically called on when used with ``Graphic.camera(with:)``.
+        public func start() async throws(CameraError) {
+            let result: Result<Void, CameraError> = await withCheckedContinuation { continuation in
                 sessionQueue.async { [self] in
-                    startCaptureSession()
-                    continuation.resume()
+                    guard !captureSession.isRunning else {
+                        continuation.resume(returning: .success(()))
+                        return
+                    }
+                    let result: Result<Void, CameraError> = configureCaptureSession()
+                    if case .success = result {
+                        startCaptureSession()
+                    }
+                    continuation.resume(returning: result)
                 }
+            }
+            if case .failure(let error) = result {
+                throw error
             }
         }
         
@@ -350,28 +330,51 @@ extension Graphic {
 
         private func startCaptureSession() {
             guard !captureSession.isRunning else { return }
+            captureSession.startRunning()
+        }
 
+        private func configureCaptureSession() -> Result<Void, CameraError> {
             captureSession.beginConfiguration()
-            if !captureSession.inputs.contains(where: { $0 === videoInput }),
-               captureSession.canAddInput(videoInput) {
+            defer { captureSession.commitConfiguration() }
+
+            if !captureSession.inputs.contains(where: { $0 === videoInput }) {
+                guard captureSession.canAddInput(videoInput) else {
+                    return .failure(.inputCanNotBeAdded)
+                }
                 captureSession.addInput(videoInput)
             }
-            if !captureSession.outputs.contains(where: { $0 === videoOutput }),
-               captureSession.canAddOutput(videoOutput) {
-                captureSession.addOutput(videoOutput)
+
+#if !os(visionOS)
+            guard captureSession.canSetSessionPreset(preset) else {
+                return .failure(.sessionPresetCanNotBeSet)
             }
+            captureSession.sessionPreset = preset
+#endif
+
+            var videoSettings: [String: Any] = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+            ]
+#if os(macOS)
+            if let dimensions: CMVideoDimensions = preset.fixedVideoDimensions {
+                videoSettings[kCVPixelBufferWidthKey as String] = Int(dimensions.width)
+                videoSettings[kCVPixelBufferHeightKey as String] = Int(dimensions.height)
+            }
+#endif
+            videoOutput.videoSettings = videoSettings
 #if os(iOS) || os(tvOS)
             if previewSized {
                 videoOutput.automaticallyConfiguresOutputBufferDimensions = false
                 videoOutput.deliversPreviewSizedOutputBuffers = true
             }
 #endif
-            captureSession.commitConfiguration()
 
-            guard captureSession.inputs.contains(where: { $0 === videoInput }),
-                  captureSession.outputs.contains(where: { $0 === videoOutput })
-            else { return }
-            captureSession.startRunning()
+            if !captureSession.outputs.contains(where: { $0 === videoOutput }) {
+                guard captureSession.canAddOutput(videoOutput) else {
+                    return .failure(.outputCanNotBeAdded)
+                }
+                captureSession.addOutput(videoOutput)
+            }
+            return .success(())
         }
 
         private func stopCaptureSession() {
@@ -414,6 +417,31 @@ extension Graphic {
         }
     }
 }
+
+// MARK: - Preset
+
+#if os(macOS)
+private extension AVCaptureSession.Preset {
+
+    var fixedVideoDimensions: CMVideoDimensions? {
+        if self == .vga640x480 {
+            return CMVideoDimensions(width: 640, height: 480)
+        }
+        if self == .hd1280x720 {
+            return CMVideoDimensions(width: 1_280, height: 720)
+        }
+        if self == .hd1920x1080 {
+            return CMVideoDimensions(width: 1_920, height: 1_080)
+        }
+        if self == .hd4K3840x2160 {
+            return CMVideoDimensions(width: 3_840, height: 2_160)
+        }
+        return nil
+    }
+}
+#endif
+
+// MARK: - Sample Buffer Delegate
 
 extension Graphic.Camera: AVCaptureVideoDataOutputSampleBufferDelegate {
  

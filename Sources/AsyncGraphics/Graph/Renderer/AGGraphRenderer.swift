@@ -200,7 +200,7 @@ extension AGGraphRenderer {
     private func startCamera(position: Graphic.CameraPosition) {
         print("AsyncGraphics - Graph - Camera - Start")
         let task = Task {
-            for await graphic in try Graphic.camera(at: position) {
+            for await graphic in try await Graphic.camera(at: position) {
                 let resizedGraphic: Graphic
                 if let maximumResolution: CGSize = activeCameraMaximumResolutions[position],
                    graphic.width > maximumResolution.width,

@@ -158,11 +158,12 @@ extension Graphic {
     }
     
     /// EXR Data
+    ///
+    /// `OpenEXR` is scene referred, the graphic is encoded in linear light.
+    /// 32 bit graphics keep their full float precision.
     public var exrData: Data {
         get async throws {
-            guard let exrData = try await image.exrData()
-            else { throw ImageDataError.exrDataNotFound }
-            return exrData
+            try await imageData(format: .openEXR)
         }
     }
     
@@ -176,19 +177,31 @@ extension Graphic {
     }
     
     /// TIFF Data
+    ///
+    /// 32 bit graphics are encoded with 32 bit float.
     public var tiffData: Data {
         get async throws {
-            guard let tiffData = try await image.tiffData()
-            else { throw ImageDataError.tiffDataNotFound }
-            return tiffData
+            try await imageData(format: .tiff)
         }
     }
     
     /// JPEG Data
     public func jpegData(compressionQuality: CGFloat = 1.0) async throws -> Data {
-        guard let jpegData = try await image.jpegData(compressionQuality: compressionQuality)
-        else { throw ImageDataError.jpegDataNotFound }
-        return jpegData
+        try await imageData(format: .jpeg, compressionQuality: compressionQuality)
+    }
+    
+    private func imageData(
+        format: TMImageFileFormat,
+        compressionQuality: CGFloat = 1.0
+    ) async throws -> Data {
+        let ciImage: CIImage = try await ciImage(colorSpace: colorSpace)
+        return try TextureMap.data(
+            ciImage: ciImage,
+            format: format,
+            bits: bits,
+            colorSpace: colorSpace,
+            compressionQuality: compressionQuality
+        )
     }
     
     /// HEIC Data
@@ -223,15 +236,23 @@ extension Graphic {
         try await writeImage(to: url, xdr: bits > ._8)
     }
     
+    /// Write an image to disk.
+    ///
+    /// The file extension of the url decides the format.
+    ///
+    /// `OpenEXR` is scene referred and always written in linear light, it ignores `xdr`.
     public func writeImage(to url: URL, xdr: Bool) async throws {
-        let colorSpace: TMColorSpace = xdr ? .xdr : colorSpace
+        let format = try TMImageFileFormat(url: url)
+        let colorSpace: TMColorSpace = (xdr && !format.isLinear) ? .xdr : colorSpace
         let ciImage: CIImage = try await ciImage(colorSpace: colorSpace)
-        let fileExtension: String = url.pathExtension.lowercased()
-        if fileExtension == "heic" || fileExtension == "heif" {
-            try writeHEIF(ciImage: ciImage, to: url, colorSpace: colorSpace)
-        } else {
-            try TextureMap.write(ciImage: ciImage, to: url, bits: bits, colorSpace: colorSpace)
-        }
+        try TextureMap.write(
+            ciImage: ciImage,
+            to: url,
+            format: format,
+            bits: bits,
+            colorSpace: colorSpace,
+            compressionQuality: 1.0
+        )
     }
     
     private func heifData(
@@ -262,30 +283,6 @@ extension Graphic {
         }
         
         return data
-    }
-    
-    private func writeHEIF(
-        ciImage: CIImage,
-        to url: URL,
-        colorSpace: TMColorSpace
-    ) throws {
-        let context = CIContext(options: nil)
-        if bits >= ._16 {
-            try context.writeHEIF10Representation(
-                of: ciImage,
-                to: url,
-                colorSpace: colorSpace.cgColorSpace,
-                options: [:]
-            )
-        } else {
-            try context.writeHEIFRepresentation(
-                of: ciImage,
-                to: url,
-                format: bits.ciFormat,
-                colorSpace: colorSpace.cgColorSpace,
-                options: [:]
-            )
-        }
     }
     
     private func ciImage(colorSpace: TMColorSpace) async throws -> CIImage {

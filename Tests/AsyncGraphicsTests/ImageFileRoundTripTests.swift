@@ -82,16 +82,32 @@ struct ImageFileRoundTripTests {
         #expect(difference < 0.001, "difference was \(difference)")
     }
 
-    @Test("EXR: a non linear graphic round trips as its linear equivalent")
-    func exrRoundTripsNonLinearGraphicsAsLinear() async throws {
+    @Test("EXR: a non linear graphic round trips with its values unchanged")
+    func exrRoundTripsNonLinearGraphicsUnchanged() async throws {
         let graphic: Graphic = try Self.testGraphic(options: .bit32)
         let loaded: Graphic = try await Graphic.image(data: try await graphic.exrData)
-        let linear: Graphic = try await graphic.convertColorSpace(
-            from: .nonLinearSRGB,
-            to: .linearSRGB
-        )
-        let difference: Float = try await Self.maximumDifference(linear, loaded)
+
+        /// The linear color space is assigned, not converted to,
+        /// so no transfer curve is applied to the values.
+        let difference: Float = try await Self.maximumDifference(graphic, loaded)
         #expect(difference < 0.001, "difference was \(difference)")
+    }
+
+    @Test("EXR: values above 1.0 round trip unchanged")
+    func exrRoundTripsHighDynamicRangeUnchanged() async throws {
+        let graphic: Graphic = try .pixels(
+            [[PixelColor(red: 123.0, green: 12.0, blue: 1.0, opacity: 1.0),
+              PixelColor(red: 61.5, green: 6.0, blue: 0.5, opacity: 1.0)]],
+            options: .bit32
+        )
+        let loaded: Graphic = try await Graphic.image(data: try await graphic.exrData)
+        let channels: [Float] = try loaded.channels32
+        #expect(abs(channels[0] - 123.0) < 0.01, "red was \(channels[0])")
+        #expect(abs(channels[1] - 12.0) < 0.01, "green was \(channels[1])")
+        #expect(abs(channels[2] - 1.0) < 0.01, "blue was \(channels[2])")
+        #expect(abs(channels[4] - 61.5) < 0.01, "red was \(channels[4])")
+        #expect(abs(channels[5] - 6.0) < 0.01, "green was \(channels[5])")
+        #expect(abs(channels[6] - 0.5) < 0.01, "blue was \(channels[6])")
     }
 
     // MARK: Premultiplied Alpha
@@ -108,14 +124,10 @@ struct ImageFileRoundTripTests {
     func exrLosesPremultipliedAlpha() async throws {
         let graphic: Graphic = try Self.translucentGraphic()
         let loaded: Graphic = try await Graphic.image(data: try await graphic.exrData)
-        let linear: Graphic = try await graphic.convertColorSpace(
-            from: .nonLinearSRGB,
-            to: .linearSRGB
-        )
 
         /// `OpenEXR` stores straight alpha, colors are divided by their alpha when written
         /// and are not multiplied back in when read, so translucent pixels come back brighter.
-        let difference: Float = try await Self.maximumDifference(linear, loaded)
+        let difference: Float = try await Self.maximumDifference(graphic, loaded)
         withKnownIssue("Straight alpha is not premultiplied when an image is loaded") {
             #expect(difference < 0.001, "difference was \(difference)")
         }
@@ -143,12 +155,30 @@ struct ImageFileRoundTripTests {
         #expect(maximum > 4.0, "maximum was \(maximum)")
     }
 
-    @Test("TIFF: values above 1.0 survive")
-    func tiffKeepsHighDynamicRange() async throws {
+    @Test("TIFF: values above 1.0 round trip unchanged")
+    func tiffRoundTripsHighDynamicRangeUnchanged() async throws {
         let graphic: Graphic = try Self.highDynamicRangeGraphic()
         let loaded: Graphic = try await Graphic.image(data: try await graphic.tiffData)
-        let maximum: Float = try loaded.channels32.max() ?? 0.0
-        #expect(maximum > 4.0, "maximum was \(maximum)")
+
+        /// `TIFF` is written in the color space the graphic is already tagged with,
+        /// so no transfer curve is applied to the values.
+        let difference: Float = try await Self.maximumDifference(graphic, loaded)
+        #expect(difference < 0.01, "difference was \(difference)")
+    }
+
+    @Test("PNG: values shift into the display color space when loaded")
+    func pngShiftsIntoTheDisplayColorSpace() async throws {
+        let graphic: Graphic = try Self.testGraphic(options: .bit32)
+        let loaded: Graphic = try await Graphic.image(data: try await graphic.pngData)
+
+        /// `PNG` itself is written with an `sRGB` profile and keeps its values,
+        /// but loading goes through an image that color matches integer formats
+        /// to the display, so the graphic comes back tagged `Display P3` with
+        /// every color shifted. `TIFF` keeps its float values and is unaffected.
+        let difference: Float = try await Self.maximumDifference(graphic, loaded)
+        withKnownIssue("Integer images are color matched to the display when loaded") {
+            #expect(difference < 0.001, "difference was \(difference)")
+        }
     }
 
     @Test("PNG: values above 1.0 are clamped")

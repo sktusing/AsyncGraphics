@@ -160,7 +160,7 @@ extension Graphic {
     /// EXR Data
     ///
     /// `OpenEXR` is scene referred, the graphic is encoded in linear light.
-    /// 32 bit graphics keep their full float precision.
+    /// Values are written as they are, 32 bit graphics keep their full float precision.
     public var exrData: Data {
         get async throws {
             try await imageData(format: .openEXR)
@@ -194,6 +194,7 @@ extension Graphic {
         format: TMImageFileFormat,
         compressionQuality: CGFloat = 1.0
     ) async throws -> Data {
+        let colorSpace: TMColorSpace = try encodingColorSpace(format: format, xdr: false)
         let ciImage: CIImage = try await ciImage(colorSpace: colorSpace)
         return try TextureMap.data(
             ciImage: ciImage,
@@ -202,6 +203,25 @@ extension Graphic {
             colorSpace: colorSpace,
             compressionQuality: compressionQuality
         )
+    }
+    
+    /// The color space a graphic is encoded with.
+    ///
+    /// Scene referred formats, like `OpenEXR`, are *assigned* the linear counterpart
+    /// of the graphic's color space instead of being converted to it.
+    /// A graphic holds raw light values, converting would apply a display transfer
+    /// curve that was never there, which explodes values above 1.0.
+    private func encodingColorSpace(
+        format: TMImageFileFormat,
+        xdr: Bool
+    ) throws -> TMColorSpace {
+        if format.isLinear {
+            return try colorSpace.linear
+        } else if xdr {
+            return .xdr
+        } else {
+            return colorSpace
+        }
     }
     
     /// HEIC Data
@@ -243,7 +263,7 @@ extension Graphic {
     /// `OpenEXR` is scene referred and always written in linear light, it ignores `xdr`.
     public func writeImage(to url: URL, xdr: Bool) async throws {
         let format = try TMImageFileFormat(url: url)
-        let colorSpace: TMColorSpace = (xdr && !format.isLinear) ? .xdr : colorSpace
+        let colorSpace: TMColorSpace = try encodingColorSpace(format: format, xdr: xdr)
         let ciImage: CIImage = try await ciImage(colorSpace: colorSpace)
         try TextureMap.write(
             ciImage: ciImage,

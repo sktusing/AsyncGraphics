@@ -42,7 +42,7 @@ extension Graphic3D {
             shader: .name("blur3d"),
             graphics: [self],
             uniforms: Blur3DUniforms(
-                type: (Blur3DType.box.index - 1),
+                type: Blur3DType.box.index - 1,
                 radius: Float(relativeRadius),
                 count: UInt32(sampleCount),
                 direction: VectorUniform.zero,
@@ -69,7 +69,7 @@ extension Graphic3D {
             shader: .name("blur3d"),
             graphics: [self],
             uniforms: Blur3DUniforms(
-                type: Blur3DType.zoom.index,
+                type: Blur3DType.zoom.index - 1,
                 radius: Float(relativeRadius),
                 count: UInt32(sampleCount),
                 direction: VectorUniform.zero,
@@ -93,7 +93,7 @@ extension Graphic3D {
             shader: .name("blur3d"),
             graphics: [self],
             uniforms: Blur3DUniforms(
-                type: Blur3DType.direction.index,
+                type: Blur3DType.direction.index - 1,
                 radius: Float(relativeRadius),
                 count: UInt32(sampleCount),
                 direction: direction.uniform,
@@ -115,7 +115,7 @@ extension Graphic3D {
             shader: .name("blur3d"),
             graphics: [self],
             uniforms: Blur3DUniforms(
-                type: Blur3DType.random.index,
+                type: Blur3DType.random.index - 1,
                 radius: Float(relativeRadius),
                 count: 0,
                 direction: VectorUniform.zero,

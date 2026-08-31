@@ -33,6 +33,21 @@ extension CodableGraphic.Content.Shape {
         public var foregroundColor: GraphicMetadata<PixelColor> = .init(value: .fixed(.white))
         public var backgroundColor: GraphicMetadata<PixelColor> = .init(value: .fixed(.clear))
         
+        public var premultiply: GraphicMetadata<Bool> = .init(value: .fixed(true))
+        
+        private func premultiplyOptions(
+            at resolution: CGSize,
+            options: Graphic.ContentOptions
+        ) -> Graphic.ContentOptions {
+            var options = options
+            if premultiply.value.eval(at: resolution) {
+                options.remove(.pureAlpha)
+            } else {
+                options.insert(.pureAlpha)
+            }
+            return options
+        }
+        
         public func render(
             at resolution: CGSize,
             options: Graphic.ContentOptions = []
@@ -48,7 +63,7 @@ extension CodableGraphic.Content.Shape {
                 color: foregroundColor.value.eval(at: resolution),
                 backgroundColor: backgroundColor.value.eval(at: resolution),
                 resolution: resolution,
-                options: options)
+                options: premultiplyOptions(at: resolution, options: options))
         }
         
         @VariantMacro

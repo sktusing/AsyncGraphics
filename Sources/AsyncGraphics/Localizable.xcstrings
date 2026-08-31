@@ -2851,6 +2851,16 @@
         }
       }
     },
+    "property.premultiply" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premultiply"
+          }
+        }
+      }
+    },
     "property.radius" : {
       "localizations" : {
         "en" : {

@@ -31,6 +31,21 @@ extension CodableGraphic3D.Content.Shape {
                                                                   maximum: .fixed(2.0),
                                                                   options: .spatial)
         
+        public var premultiply: GraphicMetadata<Bool> = .init(value: .fixed(true))
+        
+        private func premultiplyOptions(
+            at resolution: Size3D,
+            options: Graphic3D.ContentOptions
+        ) -> Graphic3D.ContentOptions {
+            var options = options
+            if premultiply.value.eval(at: resolution) {
+                options.remove(.pureAlpha)
+            } else {
+                options.insert(.pureAlpha)
+            }
+            return options
+        }
+        
         public func render(
             at resolution: Size3D,
             options: Graphic3D.ContentOptions = []
@@ -48,7 +63,7 @@ extension CodableGraphic3D.Content.Shape {
                     color: foregroundColor.value.eval(at: resolution),
                     backgroundColor: backgroundColor.value.eval(at: resolution),
                     resolution: resolution,
-                    options: options)
+                    options: premultiplyOptions(at: resolution, options: options))
                 
             } else {
                 
@@ -61,7 +76,7 @@ extension CodableGraphic3D.Content.Shape {
                     color: foregroundColor.value.eval(at: resolution),
                     backgroundColor: backgroundColor.value.eval(at: resolution),
                     resolution: resolution,
-                    options: options)
+                    options: premultiplyOptions(at: resolution, options: options))
             }
         }
         

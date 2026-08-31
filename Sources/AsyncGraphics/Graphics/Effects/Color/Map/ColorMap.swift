@@ -8,6 +8,7 @@ import PixelColor
 extension Graphic {
     
     private struct ColorMapUniforms: Uniforms {
+        let premultiply: Bool
         let backgroundColor: ColorUniform
         let foregroundColor: ColorUniform
     }
@@ -23,8 +24,10 @@ extension Graphic {
             shader: .name("colorMap"),
             graphics: [self],
             uniforms: ColorMapUniforms(
+                premultiply: options.premultiply,
                 backgroundColor: backgroundColor.uniform,
-                foregroundColor: foregroundColor.uniform),
+                foregroundColor: foregroundColor.uniform
+            ),
             options: options.colorRenderOptions
         )
     }

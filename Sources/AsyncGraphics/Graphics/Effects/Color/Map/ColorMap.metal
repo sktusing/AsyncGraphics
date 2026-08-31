@@ -12,6 +12,7 @@ struct VertexOut {
 };
 
 struct Uniforms {
+    bool premultiply;
     packed_float4 backgroundColor;
     packed_float4 foregroundColor;
 };
@@ -30,6 +31,11 @@ fragment float4 colorMap(VertexOut out [[stage_in]],
     
     float4 backgroundColor = uniforms.backgroundColor;
     float4 foregroundColor = uniforms.foregroundColor;
-    
+
+    if (uniforms.premultiply) {
+        backgroundColor = float4(backgroundColor.rgb * backgroundColor.a, backgroundColor.a);
+        foregroundColor = float4(foregroundColor.rgb * foregroundColor.a, foregroundColor.a);
+    }
+
     return mix(backgroundColor, foregroundColor, monochrome);
 }

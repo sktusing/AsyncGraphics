@@ -7,6 +7,7 @@ import PixelColor
 extension Graphic3D {
     
     private struct ColorMap3DUniforms: Uniforms {
+        let premultiply: Bool
         let backgroundColor: ColorUniform
         let foregroundColor: ColorUniform
     }
@@ -22,8 +23,10 @@ extension Graphic3D {
             shader: .name("colorMap3d"),
             graphics: [self],
             uniforms: ColorMap3DUniforms(
+                premultiply: options.premultiply,
                 backgroundColor: backgroundColor.uniform,
-                foregroundColor: foregroundColor.uniform),
+                foregroundColor: foregroundColor.uniform
+            ),
             options: options.colorRenderOptions
         )
     }

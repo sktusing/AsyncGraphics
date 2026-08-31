@@ -7,6 +7,7 @@
 using namespace metal;
 
 struct Uniforms {
+    bool premultiply;
     float4 backgroundColor;
     float4 foregroundColor;
 };
@@ -36,6 +37,11 @@ kernel void colorMap3d(const device Uniforms& uniforms [[ buffer(0) ]],
     float4 backgroundColor = uniforms.backgroundColor;
     float4 foregroundColor = uniforms.foregroundColor;
     
+    if (uniforms.premultiply) {
+        backgroundColor = float4(backgroundColor.rgb * backgroundColor.a, backgroundColor.a);
+        foregroundColor = float4(foregroundColor.rgb * foregroundColor.a, foregroundColor.a);
+    }
+
     float4 mappedColor = mix(backgroundColor, foregroundColor, monochrome);
     
     targetTexture.write(mappedColor, pos);

@@ -22,11 +22,11 @@ extension Graphic3D {
     
     @EnumMacro
     public enum Blur3DType: String, GraphicEnum {
+        case layered
         case box
         case direction
         case zoom
         case random
-        case layered
     }
     
     public func blurredBox(

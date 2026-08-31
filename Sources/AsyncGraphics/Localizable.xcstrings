@@ -981,6 +981,16 @@
         }
       }
     },
+    "option.blur3DType.layered" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Layered"
+          }
+        }
+      }
+    },
     "option.blur3DType.random" : {
       "localizations" : {
         "en" : {
@@ -1842,16 +1852,44 @@
       }
     },
     "option.opticalFlowAccuracy.high" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "High"
+          }
+        }
+      }
     },
     "option.opticalFlowAccuracy.low" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low"
+          }
+        }
+      }
     },
     "option.opticalFlowAccuracy.medium" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium"
+          }
+        }
+      }
     },
     "option.opticalFlowAccuracy.veryHigh" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Very High"
+          }
+        }
+      }
     },
     "option.placement.fill" : {
       "localizations" : {

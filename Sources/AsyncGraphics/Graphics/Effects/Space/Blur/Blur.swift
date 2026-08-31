@@ -22,11 +22,11 @@ extension Graphic {
     @EnumMacro
     public enum BlurType: String, GraphicEnum {
         case gaussian
+        case layered
         case box
         case angle
         case zoom
         case random
-        case layered
     }
     
     /// Gaussian Blur

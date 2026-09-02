@@ -10,9 +10,10 @@ import simd
 extension Graphic {
 
     private struct EquirectOrientationUniforms: Uniforms {
-        let rotation: QuaternionUniform
+        /// The booleans come first, so the quaternion stays four byte aligned in both Swift and Metal.
         let mirrorHorizontal: Bool
         let mirrorVertical: Bool
+        let rotation: QuaternionUniform
     }
 
     /// Equirectangular Orientation
@@ -41,9 +42,9 @@ extension Graphic {
             shader: .name("equirectOrientation"),
             graphics: [self],
             uniforms: EquirectOrientationUniforms(
-                rotation: rotation.uniform,
                 mirrorHorizontal: mirrorHorizontal,
-                mirrorVertical: mirrorVertical
+                mirrorVertical: mirrorVertical,
+                rotation: rotation.uniform
             ),
             metadata: Renderer.Metadata(
                 resolution: resolution,

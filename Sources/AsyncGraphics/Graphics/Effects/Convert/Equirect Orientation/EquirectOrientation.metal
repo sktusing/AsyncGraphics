@@ -14,9 +14,9 @@ struct VertexOut {
 };
 
 struct Uniforms {
-    packed_float4 rotation;
     bool mirrorHorizontal;
     bool mirrorVertical;
+    packed_float4 rotation;
 };
 
 // Rotates a direction by a quaternion, the imaginary part in xyz and the real part in w.

@@ -27,6 +27,20 @@ extension Graphic3D {
         case direction
         case zoom
         case random
+        var shaderIndex: UInt32 {
+            switch self {
+            case .layered:
+                0 // Not used.
+            case .box:
+                0
+            case .direction:
+                1
+            case .zoom:
+                2
+            case .random:
+                3
+            }
+        }
     }
     
     public func blurredBox(
@@ -42,7 +56,7 @@ extension Graphic3D {
             shader: .name("blur3d"),
             graphics: [self],
             uniforms: Blur3DUniforms(
-                type: Blur3DType.box.index - 1,
+                type: Blur3DType.box.shaderIndex,
                 radius: Float(relativeRadius),
                 count: UInt32(sampleCount),
                 direction: VectorUniform.zero,
@@ -69,7 +83,7 @@ extension Graphic3D {
             shader: .name("blur3d"),
             graphics: [self],
             uniforms: Blur3DUniforms(
-                type: Blur3DType.zoom.index - 1,
+                type: Blur3DType.zoom.shaderIndex,
                 radius: Float(relativeRadius),
                 count: UInt32(sampleCount),
                 direction: VectorUniform.zero,
@@ -93,7 +107,7 @@ extension Graphic3D {
             shader: .name("blur3d"),
             graphics: [self],
             uniforms: Blur3DUniforms(
-                type: Blur3DType.direction.index - 1,
+                type: Blur3DType.direction.shaderIndex,
                 radius: Float(relativeRadius),
                 count: UInt32(sampleCount),
                 direction: direction.uniform,
@@ -115,7 +129,7 @@ extension Graphic3D {
             shader: .name("blur3d"),
             graphics: [self],
             uniforms: Blur3DUniforms(
-                type: Blur3DType.random.index - 1,
+                type: Blur3DType.random.shaderIndex,
                 radius: Float(relativeRadius),
                 count: 0,
                 direction: VectorUniform.zero,

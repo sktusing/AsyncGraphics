@@ -27,6 +27,22 @@ extension Graphic {
         case angle
         case zoom
         case random
+        var shaderIndex: UInt32 {
+            switch self {
+            case .gaussian:
+                0 // Not used.
+            case .layered:
+                5
+            case .box:
+                1
+            case .angle:
+                2
+            case .zoom:
+                3
+            case .random:
+                4
+            }
+        }
     }
     
     /// Gaussian Blur
@@ -93,7 +109,7 @@ extension Graphic {
             shader: .name("blur"),
             graphics: [self],
             uniforms: BlurUniforms(
-                type: BlurType.layered.index,
+                type: BlurType.layered.shaderIndex,
                 radius: Float(relativeRadius),
                 count: 1,
                 angle: 0.0,
@@ -116,7 +132,7 @@ extension Graphic {
             shader: .name("blur"),
             graphics: [self],
             uniforms: BlurUniforms(
-                type: BlurType.box.index,
+                type: BlurType.box.shaderIndex,
                 radius: Float(relativeRadius),
                 count: UInt32(min(max(sampleCount, 1), Int(UInt32.max))),
                 angle: 0.0,
@@ -143,7 +159,7 @@ extension Graphic {
             shader: .name("blur"),
             graphics: [self],
             uniforms: BlurUniforms(
-                type: BlurType.zoom.index,
+                type: BlurType.zoom.shaderIndex,
                 radius: Float(relativeRadius),
                 count: UInt32(min(max(sampleCount, 1), Int(UInt32.max))),
                 angle: 0.0,
@@ -167,7 +183,7 @@ extension Graphic {
             shader: .name("blur"),
             graphics: [self],
             uniforms: BlurUniforms(
-                type: BlurType.angle.index,
+                type: BlurType.angle.shaderIndex,
                 radius: Float(relativeRadius),
                 count: UInt32(min(max(sampleCount, 1), Int(UInt32.max))),
                 angle: angle.uniform,
@@ -189,7 +205,7 @@ extension Graphic {
             shader: .name("blur"),
             graphics: [self],
             uniforms: BlurUniforms(
-                type: BlurType.random.index,
+                type: BlurType.random.shaderIndex,
                 radius: Float(relativeRadius),
                 count: 0,
                 angle: 0.0,

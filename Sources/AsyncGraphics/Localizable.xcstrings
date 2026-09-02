@@ -331,6 +331,26 @@
         }
       }
     },
+    "graphic.effect.convert.cubeMapToEquirect" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cube Map to Equirect"
+          }
+        }
+      }
+    },
+    "graphic.effect.convert.equirectToCubeMap" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Equirect to Cube Map"
+          }
+        }
+      }
+    },
     "graphic.effect.convert.frameCrop" : {
       "localizations" : {
         "en" : {
@@ -2401,6 +2421,16 @@
         }
       }
     },
+    "property.faceResolution" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Face Resolution"
+          }
+        }
+      }
+    },
     "property.foregroundColor" : {
       "localizations" : {
         "en" : {
@@ -2547,6 +2577,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Inner Radius"
+          }
+        }
+      }
+    },
+    "property.inside" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inside"
           }
         }
       }

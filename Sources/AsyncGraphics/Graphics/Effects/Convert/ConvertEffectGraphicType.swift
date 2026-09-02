@@ -8,6 +8,8 @@ public enum ConvertEffectGraphicType: String, CodableGraphicTypeProtocol {
     case cornerPin
     case crop
     case frameCrop
+    case equirectToCubeMap
+    case cubeMapToEquirect
 }
 
 extension ConvertEffectGraphicType {
@@ -24,6 +26,10 @@ extension ConvertEffectGraphicType {
             "crop"
         case .frameCrop:
             "crop"
+        case .equirectToCubeMap:
+            "cube.transparent"
+        case .cubeMapToEquirect:
+            "globe"
         }
     }
 }
@@ -41,6 +47,10 @@ extension ConvertEffectGraphicType {
         case .crop:
                 .basic
         case .frameCrop:
+                .advanced
+        case .equirectToCubeMap:
+                .advanced
+        case .cubeMapToEquirect:
                 .advanced
         }
     }

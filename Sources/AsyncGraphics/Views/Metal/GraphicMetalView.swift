@@ -114,6 +114,11 @@ extension GraphicMetalView: MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
     
     func draw(in view: MTKView) {
+#if DEBUG
+        let performanceInterval = AGPerformanceTrace.presentation.begin("Drawable and draw sync")
+        defer { AGPerformanceTrace.presentation.end(performanceInterval) }
+#endif
+
         guard let graphic: Graphic = graphic else { return }
         let sourceTexture: MTLTexture = graphic.texture
         
@@ -161,6 +166,9 @@ extension GraphicMetalView: MTKViewDelegate {
             }
         }
         commandBuffer.present(drawable)
+#if DEBUG
+        AGPerformanceTrace.presentation.trackGPU(commandBuffer, detail: "Preview \(destinationTexture.width)x\(destinationTexture.height)")
+#endif
         commandBuffer.commit()
     }
 }

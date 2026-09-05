@@ -56,6 +56,11 @@ extension Graphic {
     }
     
     private func reduction(by sampleMethod: ReduceMethod, axis sampleAxis: ReduceAxis) async throws -> Graphic {
+#if DEBUG
+        let performanceInterval = AGPerformanceTrace.rendering.begin("MPS reduce async")
+        defer { AGPerformanceTrace.rendering.end(performanceInterval) }
+#endif
+
                 
         let texture: SendableTexture = try await withCheckedThrowingContinuation { continuation in
             
@@ -80,6 +85,9 @@ extension Graphic {
                     continuation.resume(returning: texture.send())
                 }
                 
+#if DEBUG
+                AGPerformanceTrace.rendering.trackGPU(commandBuffer, detail: "MPS reduce async")
+#endif
                 commandBuffer.commit()
                 
             } catch {

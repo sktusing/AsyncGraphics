@@ -16,6 +16,11 @@ struct GraphicRepresentableView: Sendable {
     let didRender: @Sendable (UUID) -> ()
     
     private func render(in view: GraphicMetalViewable) async throws {
+#if DEBUG
+        let performanceInterval = AGPerformanceTrace.presentation.begin("Representable prepare async")
+        defer { AGPerformanceTrace.presentation.end(performanceInterval) }
+#endif
+
         var graphic: Graphic = graphic
         if !preProcessed {
             if extendedDynamicRange {

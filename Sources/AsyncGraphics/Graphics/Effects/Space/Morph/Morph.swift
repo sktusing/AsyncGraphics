@@ -28,6 +28,11 @@ extension Graphic {
     }
     
     func morphed(type: MorphType, size: CGSize) async throws -> Graphic {
+#if DEBUG
+        let performanceInterval = AGPerformanceTrace.rendering.begin("MPS morph async")
+        defer { AGPerformanceTrace.rendering.end(performanceInterval) }
+#endif
+
         
         let targetTexture: MTLTexture = try .empty(resolution: resolution, bits: bits, usage: .write)
         
@@ -63,6 +68,9 @@ extension Graphic {
                 continuation.resume()
             }
             
+#if DEBUG
+            AGPerformanceTrace.rendering.trackGPU(commandBuffer, detail: "MPS morph async")
+#endif
             commandBuffer.commit()
         }
         

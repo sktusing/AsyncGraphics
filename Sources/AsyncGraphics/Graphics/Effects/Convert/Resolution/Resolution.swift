@@ -110,6 +110,11 @@ extension Graphic {
         method: ResizeMethod
     ) async throws -> Graphic {
         
+
+#if DEBUG
+        let performanceInterval = AGPerformanceTrace.rendering.begin("MPS resize async")
+        defer { AGPerformanceTrace.rendering.end(performanceInterval) }
+#endif
         guard resolution.width > 1, resolution.height > 1 else {
             throw ResizeError.resolutionToLow
         }
@@ -140,6 +145,9 @@ extension Graphic {
                 continuation.resume()
             }
             
+#if DEBUG
+            AGPerformanceTrace.rendering.trackGPU(commandBuffer, detail: "MPS resize async")
+#endif
             commandBuffer.commit()
         }
         

@@ -49,6 +49,11 @@ extension Graphic {
     public func blurred(
         radius: CGFloat
     ) async throws -> Graphic {
+#if DEBUG
+        let performanceInterval = AGPerformanceTrace.rendering.begin("Gaussian blur async")
+        defer { AGPerformanceTrace.rendering.end(performanceInterval) }
+#endif
+
         
         let targetTexture: MTLTexture = try .empty(resolution: resolution, bits: bits, usage: .write)
         
@@ -71,6 +76,9 @@ extension Graphic {
                 continuation.resume()
             }
             
+#if DEBUG
+            AGPerformanceTrace.rendering.trackGPU(commandBuffer, detail: "Gaussian blur async")
+#endif
             commandBuffer.commit()
         }
         

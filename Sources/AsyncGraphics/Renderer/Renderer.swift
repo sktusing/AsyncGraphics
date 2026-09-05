@@ -385,6 +385,12 @@ public struct Renderer {
         options: Options = Options()
     ) async throws -> G {
         
+#if DEBUG
+        let performanceInterval = AGPerformanceTrace.rendering.begin("Render async", detail: name)
+        defer { AGPerformanceTrace.rendering.end(performanceInterval) }
+        var preparationInterval = AGPerformanceTrace.rendering.begin("Prepare and encode async", detail: name)
+        defer { AGPerformanceTrace.rendering.end(preparationInterval) }
+#endif
         guard let resolution: MultiDimensionalResolution = metadata?.resolution ?? {
             if let graphic = graphics.first as? Graphic {
                 return graphic.resolution
@@ -677,6 +683,10 @@ public struct Renderer {
         
         try Task.checkCancellation()
         
+#if DEBUG
+        AGPerformanceTrace.rendering.end(preparationInterval)
+        preparationInterval = nil
+#endif
         // MARK: Render
         var graphic: G = try await withCheckedThrowingContinuation { continuation in
         
@@ -691,6 +701,9 @@ public struct Renderer {
                 continuation.resume(returning: graphic)
             }
             
+#if DEBUG
+            AGPerformanceTrace.rendering.trackGPU(commandBuffer, detail: "\(name) \(targetTexture.width)x\(targetTexture.height)x\(targetTexture.depth)")
+#endif
             commandBuffer.commit()
         }
         if sampleCount > 1 {
